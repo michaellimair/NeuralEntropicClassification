@@ -9,12 +9,11 @@ def weights_init(m):
     """
     Initialise weights of the model.
     """
-    if (type(m) == nn.ConvTranspose2d or type(m) == nn.Conv2d):
-        nn.init.normal_(m.weight.data, 0.0, 0.02).cuda()
-    elif (type(m) == nn.BatchNorm2d):
-        nn.init.normal_(m.weight.data, 1.0, 0.02).cuda()
-        nn.init.constant_(m.bias.data, 0).cuda()
-
+    if(type(m) == nn.ConvTranspose2d or type(m) == nn.Conv2d):
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif(type(m) == nn.BatchNorm2d):
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
 
 # Basic architecture implemented in the PyTorch tutorial
 class Net(nn.Module):
@@ -50,13 +49,14 @@ class Net(nn.Module):
 
 
 def loss_func(x_output, y):
-        mean_f = x_output.mean()  # E(f(x*,x,y))
-        mean_class = torch.log(1 / len(set(y)) * torch.sum(torch.exp(x_output), 1)).mean()
-        loss = -(mean_f - mean_class)
-        return loss
-
-# use GPU if available
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+    # TODO: Check gradient function
+    f_label = torch.zeros([128])
+    for idx, class_lbl in enumerate(y):
+        f_label[idx] = x_output[idx][class_lbl]
+    mean_f = f_label.mean()  # E(f(x*,x,y))
+    mean_class = torch.log(1 / len(set(y)) * torch.sum(torch.exp(x_output), 1)).mean()
+    loss = -(mean_f - mean_class)
+    return loss
 
 params = {
     'batch_size': 128,  # size of the batches
@@ -98,22 +98,19 @@ for epoch in range(2):  # loop over the dataset multiple times
     for i, data in enumerate(trainloader, 0):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
-        if torch.cuda.is_available():
-            inputs = inputs.to(device)
-            labels = labels.to(device)
 
+        # zero the parameter gradients
         optimizer.zero_grad()
 
         # forward + backward + optimize
         outputs = net(inputs)
-
         loss = loss_func(outputs, labels)
-        loss.backward()
+        loss.backward(retain_graph=True)
         optimizer.step()
 
         # print statistics
         running_loss += loss.item()
-        if i % 200 == 199:  # print every 200 mini-batches
+        if i % 100 == 99:    # print every 100 mini-batches
             print('[%d, %5d] loss: %.3f' %
                   (epoch + 1, i + 1, running_loss / 200))
             running_loss = 0.0
@@ -125,8 +122,6 @@ images, labels = dataiter.next()
 
 print('GroundTruth: ', ' '.join('%5s' % classes[labels[j]] for j in range(4)))
 
-
-images = images.to(device)
 outputs = net(images)
 _, predicted = torch.max(outputs, 1)
 
@@ -138,14 +133,13 @@ total = 0
 with torch.no_grad():
     for data in testloader:
         images, labels = data
-        images = images.to(device)
         outputs = net(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
-        correct += torch.sum(predicted.to(device) == labels.to(device)).item()
+        correct += torch.sum(predicted == labels).item()
 
 print('Accuracy of the network on the 10000 test images: %d %%' % (
-        100 * correct / total))
+    100 * correct / total))
 
 # %%
 class_correct = list(0. for i in range(10))
@@ -153,14 +147,14 @@ class_total = list(0. for i in range(10))
 with torch.no_grad():
     for data in testloader:
         images, labels = data
-        images = images.to(device)
         outputs = net(images)
         _, predicted = torch.max(outputs, 1)
-        c = (predicted.to(device) == labels.to(device)).squeeze()
+        c = (predicted == labels).squeeze()
         for i in range(4):
             label = labels[i]
             class_correct[label] += c[i].item()
             class_total[label] += 1
+
 
 for i in range(10):
     print('Accuracy of %5s : %2d %%' % (
