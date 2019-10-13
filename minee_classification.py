@@ -48,13 +48,13 @@ class Net(nn.Module):
         return num_features
 
 
-def loss_func(x_output, y):
+def loss_func(x_output, y, num_classes = 10):
     # TODO: Check gradient function
     f_label = torch.zeros([128])
     for idx, class_lbl in enumerate(y):
         f_label[idx] = x_output[idx][class_lbl]
     mean_f = f_label.mean()  # E(f(x*,x,y))
-    mean_class = torch.log(1 / len(set(y)) * torch.sum(torch.exp(x_output), 1)).mean()
+    mean_class = torch.log(1 / num_classes * torch.sum(torch.exp(x_output), 1)).mean()
     loss = -(mean_f - mean_class)
     return loss
 
@@ -87,7 +87,7 @@ classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 dataiter = iter(trainloader)
 images, labels = dataiter.next()
 
-net = Net().to(device)
+net = Net()
 net.apply(weights_init)
 optimizer = optim.Adam(net.parameters(), lr=params['lr'], betas=(params['b1'], params['b2']))
 # criterion = nn.CrossEntropyLoss()
